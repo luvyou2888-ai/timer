@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>간단 번역기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+  :root {
+    --bg1: #ffe3ef; --bg2: #e6e0ff; --card: #fffafc; --text: #5a3d52; --muted: #b08aa4;
+    --line: #ffc9de; --accent: #ff7eb6; --accent2: #ffa8cf; --accent-text: #fff; --err: #e0486f;
+    --shadow: 0 6px 0 #ffc9de;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg1: #2a1d33; --bg2: #1d2040; --card: #35283f; --text: #ffe8f3; --muted: #c9a5c0;
+            --line: #5b3f6b; --accent: #ff8fc2; --accent2: #c9a2ff; --accent-text: #3a1630; --err: #ff8fa8;
+            --shadow: 0 6px 0 #5b3f6b; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 24px 16px; color: var(--text);
+    background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+    font-family: "Jua", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  main { width: min(100%, 720px); }
+  h1 { font-size: 30px; margin: 8px 0 4px; text-align: center; letter-spacing: 1px; }
+  .sub { text-align: center; color: var(--muted); margin: 0 0 20px; font-size: 15px; }
+  .bunny { display: inline-block; animation: bounce 2s ease-in-out infinite; }
+  .hero { border: 0; background: none; font-size: inherit; cursor: pointer; padding: 0; }
+  .hero.morph { animation: morph .6s ease; }
+  @keyframes morph { 0% { transform: scale(1) rotate(0); } 50% { transform: scale(1.6) rotate(360deg); } 100% { transform: scale(1) rotate(720deg); } }
+  @keyframes bounce { 0%,100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-6px) rotate(6deg); } }
+  @media (prefers-reduced-motion: reduce) { .bunny { animation: none; } }
+  .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  select, button, textarea { font: inherit; color: var(--text); }
+  select {
+    flex: 1; min-width: 0; padding: 11px 14px; border-radius: 999px;
+    border: 2px solid var(--line); background: var(--card); font-size: 16px;
+  }
+  .swap {
+    border: 2px solid var(--line); background: var(--accent2); color: #fff; border-radius: 50%;
+    width: 46px; height: 46px; cursor: pointer; font-size: 20px; transition: transform .25s;
+  }
+  .swap:hover { transform: rotate(180deg); }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .panes { grid-template-columns: 1fr; } }
+  .pane { background: var(--card); border: 2px solid var(--line); border-radius: 28px; padding: 16px; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+  textarea {
+    width: 100%; min-height: 180px; resize: vertical; border: 0; outline: 0;
+    background: transparent; font-size: 17px; line-height: 1.5;
+  }
+  #out { white-space: pre-wrap; min-height: 180px; font-size: 17px; line-height: 1.5; }
+  #out.placeholder { color: var(--muted); }
+  .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .small {
+    border: 2px solid var(--line); background: transparent; border-radius: 999px; color: var(--muted);
+    padding: 3px 12px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  .small:hover { background: var(--line); }
+  .go {
+    display: block; width: 100%; margin-top: 18px; padding: 15px; border: 0; border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); color: var(--accent-text);
+    font: inherit; font-size: 19px; cursor: pointer; box-shadow: 0 5px 0 #e0609a; transition: transform .1s, box-shadow .1s;
+  }
+  .go:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #e0609a; }
+  .go:disabled { opacity: .6; cursor: default; }
+  #msg { min-height: 20px; margin-top: 10px; font-size: 14px; color: var(--err); }
+  .note { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><button class="hero bunny" id="hero" title="눌러서 변신!" aria-label="변신 버튼">🚓</button> 변신 번역기 <span aria-hidden="true">⚡</span></h1>
+  <p class="sub" id="sub">자동차를 눌러서 로봇으로 변신시켜 보세요!</p>
+
+  <div class="bar">
+    <select id="from" aria-label="원본 언어"></select>
+    <button class="swap" id="swap" title="언어 바꾸기" aria-label="언어 바꾸기">⇄</button>
+    <select id="to" aria-label="번역 언어"></select>
+  </div>
+
+  <div class="panes">
+    <div class="pane">
+      <textarea id="src" maxlength="500" placeholder="번역할 말을 적고 출동 버튼을 눌러요 🚒" aria-label="원본 텍스트"></textarea>
+      <div class="foot"><span><span id="cnt">0</span> / 500</span><button class="small" id="clear">지우기</button></div>
+    </div>
+    <div class="pane">
+      <div id="out" class="placeholder" aria-live="polite">번역 결과가 여기에 표시돼요</div>
+      <div class="foot"><span id="detected"></span><button class="small" id="copy">복사</button></div>
+    </div>
+  </div>
+
+  <button class="go" id="go">🚀 번역 출동! (Ctrl+Enter)</button>
+  <div id="msg" role="alert"></div>
+  <p class="note">번역은 MyMemory 무료 번역 서비스로 처리돼요. 입력한 텍스트가 해당 서비스로 전송되니 민감한 내용은 넣지 마세요.</p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const LANGS = { ko: "한국어", en: "영어", ja: "일본어", zh: "중국어(간체)", es: "스페인어", fr: "프랑스어", de: "독일어", ru: "러시아어", vi: "베트남어", th: "태국어" };
+
+for (const sel of [$("from"), $("to")])
+  for (const [k, v] of Object.entries(LANGS)) sel.add(new Option(v, k));
+
+let prefs = {};
+try { prefs = JSON.parse(localStorage.getItem("tr-prefs") || "{}"); } catch {}
+$("from").value = LANGS[prefs.from] ? prefs.from : "ko";
+$("to").value = LANGS[prefs.to] ? prefs.to : "en";
+function savePrefs() { try { localStorage.setItem("tr-prefs", JSON.stringify({ from: $("from").value, to: $("to").value })); } catch {} }
+
+function setOut(text, placeholder) {
+  $("out").textContent = text;
+  $("out").classList.toggle("placeholder", !!placeholder);
+}
+
+let seq = 0;
+async function translate() {
+  const text = $("src").value.trim();
+  const from = $("from").value, to = $("to").value;
+  $("msg").textContent = "";
+  if (!text) { setOut("번역 결과가 여기에 표시돼요", true); return; }
+  if (from === to) { setOut(text, false); return; }
+
+  const my = ++seq;
+  $("go").disabled = true; $("go").textContent = "변신 중… 🤖";
+  try {
+    const url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=" + from + "|" + to;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("서버 응답 오류 (" + res.status + ")");
+    const data = await res.json();
+    if (my !== seq) return;
+    if (data.responseStatus !== 200 && data.responseStatus !== "200")
+      throw new Error(data.responseDetails || "번역에 실패했어요");
+    const decoder = document.createElement("textarea");
+    decoder.innerHTML = data.responseData.translatedText;   // &quot; 등 HTML 엔티티 복원
+    setOut(decoder.value, false);
+  } catch (e) {
+    if (my !== seq) return;
+    setOut("번역 결과가 여기에 표시돼요", true);
+    $("msg").textContent = e.message + " — 잠시 후 다시 시도해 주세요.";
+  } finally {
+    if (my === seq) { $("go").disabled = false; $("go").textContent = "🚀 번역 출동! (Ctrl+Enter)"; }
+  }
+}
+
+const FORMS = [["🚓", "경찰차"], ["🚒", "소방차"], ["🚑", "구급차"], ["🚜", "트랙터"]];
+let formIdx = 0, isRobot = false;
+$("hero").onclick = () => {
+  isRobot = !isRobot;
+  if (!isRobot) formIdx = (formIdx + 1) % FORMS.length;
+  $("hero").textContent = isRobot ? "🤖" : FORMS[formIdx][0];
+  $("sub").textContent = isRobot ? "변신 완료! 출동 준비 끝!" : FORMS[formIdx][1] + " 모드예요. 눌러서 변신!";
+  $("hero").classList.remove("morph"); void $("hero").offsetWidth; $("hero").classList.add("morph");
+};
+$("go").onclick = translate;
+$("src").addEventListener("input", () => { $("cnt").textContent = $("src").value.length; });
+$("src").addEventListener("keydown", e => { if (e.ctrlKey && e.key === "Enter") translate(); });
+$("clear").onclick = () => { $("src").value = ""; $("cnt").textContent = 0; setOut("번역 결과가 여기에 표시돼요", true); $("src").focus(); };
+$("from").onchange = $("to").onchange = savePrefs;
+$("swap").onclick = () => {
+  const f = $("from").value; $("from").value = $("to").value; $("to").value = f; savePrefs();
+  if (!$("out").classList.contains("placeholder")) { $("src").value = $("out").textContent; $("cnt").textContent = $("src").value.length; translate(); }
+};
+$("copy").onclick = async () => {
+  if ($("out").classList.contains("placeholder")) return;
+  try { await navigator.clipboard.writeText($("out").textContent); $("copy").textContent = "복사됨"; }
+  catch { $("copy").textContent = "복사 실패"; }
+  setTimeout(() => $("copy").textContent = "복사", 1200);
+};
+</script>
+</body>
+</html>
