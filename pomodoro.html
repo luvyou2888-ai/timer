@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>포모도로 타이머</title>
+<style>
+  :root {
+    --bg: #fbf6f3; --card: #ffffff; --text: #2b2320; --muted: #8a7d77;
+    --track: #efe5e0; --accent: #e5533d; --btn: #2b2320; --btn-text: #fff;
+  }
+  body[data-mode="short"] { --accent: #2f9e6e; }
+  body[data-mode="long"]  { --accent: #3b82c4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1a1513; --card: #26201d; --text: #f3ebe7; --muted: #a39690;
+            --track: #3a312d; --btn: #f3ebe7; --btn-text: #1a1513; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    transition: background .3s;
+  }
+  .card {
+    width: min(92vw, 380px); padding: 28px 24px 24px; border-radius: 24px;
+    background: var(--card); box-shadow: 0 10px 40px rgba(0,0,0,.08); text-align: center;
+  }
+  .tabs { display: flex; gap: 6px; background: var(--track); padding: 4px; border-radius: 999px; }
+  .tabs button {
+    flex: 1; border: 0; background: transparent; color: var(--muted); padding: 8px 4px;
+    border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .ring { position: relative; width: 240px; height: 240px; margin: 28px auto 20px; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 10; }
+  .ring .track { stroke: var(--track); }
+  .ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .3s; }
+  .time {
+    position: absolute; inset: 0; display: grid; place-content: center;
+    font-size: 54px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px;
+  }
+  .time small { display: block; font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
+  .controls { display: flex; gap: 10px; justify-content: center; }
+  .controls button {
+    border: 0; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
+    padding: 12px 28px; border-radius: 999px;
+  }
+  #start { background: var(--accent); color: #fff; min-width: 120px; }
+  #reset { background: var(--track); color: var(--text); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .count { margin: 20px 0 0; color: var(--muted); font-size: 14px; }
+  .dots { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--track); }
+  .dots i.on { background: var(--accent); }
+  details { margin-top: 18px; text-align: left; font-size: 14px; color: var(--muted); }
+  summary { cursor: pointer; text-align: center; }
+  .set { display: grid; grid-template-columns: 1fr 70px; gap: 8px 12px; align-items: center; margin-top: 12px; }
+  .set input {
+    width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--track);
+    background: var(--bg); color: var(--text); font: inherit; text-align: center;
+  }
+  .set label.check { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body data-mode="work">
+<main class="card">
+  <div class="tabs" role="tablist" aria-label="모드">
+    <button role="tab" data-mode="work" aria-selected="true">집중</button>
+    <button role="tab" data-mode="short" aria-selected="false">짧은 휴식</button>
+    <button role="tab" data-mode="long" aria-selected="false">긴 휴식</button>
+  </div>
+
+  <div class="ring">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="track" cx="50" cy="50" r="45"/>
+      <circle class="bar" id="bar" cx="50" cy="50" r="45"/>
+    </svg>
+    <div class="time" role="timer" aria-live="off"><span id="clock">25:00</span><small id="label">집중할 시간</small></div>
+  </div>
+
+  <div class="controls">
+    <button id="start">시작</button>
+    <button id="reset">초기화</button>
+  </div>
+
+  <p class="count">오늘 완료한 포모도로 <b id="done">0</b>개</p>
+  <div class="dots" id="dots" aria-hidden="true"></div>
+
+  <details>
+    <summary>설정</summary>
+    <div class="set">
+      <label for="s-work">집중 (분)</label><input id="s-work" type="number" min="1" max="120">
+      <label for="s-short">짧은 휴식 (분)</label><input id="s-short" type="number" min="1" max="60">
+      <label for="s-long">긴 휴식 (분)</label><input id="s-long" type="number" min="1" max="60">
+      <label for="s-every">긴 휴식 주기 (회)</label><input id="s-every" type="number" min="2" max="10">
+      <label class="check"><input type="checkbox" id="s-auto"> 다음 모드로 자동 시작</label>
+    </div>
+  </details>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const MODES = { work: "집중할 시간", short: "잠깐 쉬어요", long: "푹 쉬어요" };
+const DEFAULTS = { work: 25, short: 5, long: 15, every: 4, auto: false };
+const CIRC = 2 * Math.PI * 45;
+
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+let cfg = Object.assign({}, DEFAULTS, load("pomo-cfg", {}));
+const today = new Date().toDateString();
+let stats = load("pomo-stats", {});
+if (stats.date !== today) stats = { date: today, done: 0 };
+
+let mode = "work", total = 0, remaining = 0, endAt = null, tick = null;
+let cycle = stats.done % cfg.every;
+
+$("bar").style.strokeDasharray = CIRC;
+
+function fmt(s) {
+  const m = Math.floor(s / 60), r = s % 60;
+  return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+}
+
+function render() {
+  const secs = Math.ceil(remaining);
+  $("clock").textContent = fmt(secs);
+  $("bar").style.strokeDashoffset = CIRC * (1 - remaining / total);
+  $("start").textContent = endAt ? "일시정지" : (remaining < total ? "계속" : "시작");
+  $("label").textContent = MODES[mode];
+  $("done").textContent = stats.done;
+  document.title = (endAt ? fmt(secs) + " · " : "") + "포모도로 타이머";
+  const dots = $("dots"); dots.innerHTML = "";
+  for (let i = 0; i < cfg.every; i++) {
+    const d = document.createElement("i"); if (i < cycle) d.className = "on"; dots.appendChild(d);
+  }
+}
+
+function setMode(m) {
+  stop();
+  mode = m; document.body.dataset.mode = m;
+  total = remaining = cfg[m] * 60;
+  document.querySelectorAll(".tabs button").forEach(b =>
+    b.setAttribute("aria-selected", b.dataset.mode === m));
+  render();
+}
+
+function run() {
+  endAt = Date.now() + remaining * 1000;
+  tick = setInterval(update, 250);
+  render();
+}
+function stop() {
+  if (endAt) remaining = Math.max(0, (endAt - Date.now()) / 1000);
+  endAt = null; clearInterval(tick); tick = null;
+}
+function update() {
+  remaining = Math.max(0, (endAt - Date.now()) / 1000);
+  if (remaining <= 0) return finish();
+  render();
+}
+
+function finish() {
+  stop(); remaining = 0;
+  beep();
+  let next;
+  if (mode === "work") {
+    stats.done++; cycle++;
+    save("pomo-stats", stats);
+    if (cycle >= cfg.every) { cycle = 0; next = "long"; } else next = "short";
+    notify("집중 끝! 잠깐 쉬어요 ☕");
+  } else {
+    next = "work"; notify("휴식 끝! 다시 집중해요 🍅");
+  }
+  setMode(next);
+  if (cfg.auto) run();
+}
+
+function beep() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25, 0.5].forEach(t => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.2, ac.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + t + 0.2);
+      o.start(ac.currentTime + t); o.stop(ac.currentTime + t + 0.2);
+    });
+  } catch {}
+}
+function notify(msg) {
+  try { if ("Notification" in window && Notification.permission === "granted") new Notification(msg); } catch {}
+}
+
+$("start").onclick = () => {
+  if (endAt) { stop(); render(); return; }
+  try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch {}
+  if (remaining <= 0) remaining = total;
+  run();
+};
+$("reset").onclick = () => setMode(mode);
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space") { e.preventDefault(); $("start").click(); }
+});
+
+// settings
+const fields = { work: "s-work", short: "s-short", long: "s-long", every: "s-every" };
+for (const k in fields) {
+  $(fields[k]).value = cfg[k];
+  $(fields[k]).onchange = e => {
+    const el = e.target, v = Math.min(+el.max, Math.max(+el.min, parseInt(el.value) || DEFAULTS[k]));
+    el.value = v; cfg[k] = v; save("pomo-cfg", cfg);
+    if (k === "every") { cycle = Math.min(cycle, v - 1); render(); }
+    else if (!endAt && k === mode) setMode(mode);
+  };
+}
+$("s-auto").checked = cfg.auto;
+$("s-auto").onchange = e => { cfg.auto = e.target.checked; save("pomo-cfg", cfg); };
+
+setMode("work");
+</script>
+</body>
+</html>
